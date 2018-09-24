@@ -81,14 +81,17 @@ else:
     if response == "Y":
         presidential = gen_file()
 
-# Begin the elimination and distributed process.
+# Begin the elimination and distribution process.
 # Drop informal votes
 total = sum(presidential.iloc[1:6,11])
-informal = presidential.iloc[5,11]
-print(F"\nRemoving informal votes, there were {total} informal votes or {round(informal/total *100)}% of ballots issued.")
+# informal = presidential.iloc[5,11]
+informal = presidential.loc["Informal", "Total Votes"]                          # Index Error
+print(informal)
+#print(F"\nRemoving informal votes, there were {total} informal votes or {round(informal/total *100)}% of ballots issued.")
 presidential.drop(labels="Informal",inplace=True)
 
 print("\nFirst Count")
+
 primary = presidential.iloc[1:5,11]
 Winner = False
 for count in primary:
