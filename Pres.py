@@ -46,6 +46,10 @@ def gen_file():
 
     return pres
 
+def voteinputs():
+    """Loops through the booths and prompts the user for the vote counts at each booth. Repeats for each Candidate
+    returns a dictionary with the vote counts as a list."""
+
 def distribute(candidate):
     """
     Allocates the preferences of an eliminated candidate and modifies the count.
@@ -70,7 +74,7 @@ columns.append("Total Votes")
 print("Welcome to Election Helper. This Script assists with the count and distribution of the Presidential Count")
 file = os.path.isfile("presidential.xlsx")
 if file:
-    presidential = pd.read_excel("presidential.xlsx")
+    presidential = pd.read_excel("presidential.xlsx",skiprows=1,index_col='Position')
     print("Loaded presidential spreadsheet")
     print(presidential)
 else:
@@ -80,22 +84,23 @@ else:
     # TODO fix up non y/n responses.
     if response == "Y":
         presidential = gen_file()
+    # test
 
 # Begin the elimination and distribution process.
 # Drop informal votes
-total = sum(presidential.iloc[1:6,11])
+total = sum(presidential.loc["A":"D","Total Votes"])
 # informal = presidential.iloc[5,11]
 informal = presidential.loc["Informal", "Total Votes"]                          # Index Error
 print(informal)
-#print(F"\nRemoving informal votes, there were {total} informal votes or {round(informal/total *100)}% of ballots issued.")
+print(F"\nRemoving informal votes, there were {total} informal votes or {round(informal/total *100,2)}% of ballots cast.")
 presidential.drop(labels="Informal",inplace=True)
 
 print("\nFirst Count")
 
-primary = presidential.iloc[1:5,11]
+primary = presidential.loc["A":"D","Total Votes"]
 Winner = False
 for count in primary:
-    if count > (0.5 * total  + 1):
+    if count > (0.5 * total + 1):
         print("Winner Found...")
         Winner = True
         # TODO add in winner finding code
@@ -103,14 +108,16 @@ for count in primary:
         Winner = False
 if Winner is False:
     print("No candidate has a majority on count 1, going to preferences.")
-lowest = (min(presidential.iloc[1:5,11]))
-remove = (presidential.loc[presidential[11] == lowest])
-remove = str(remove[0])
-remove = remove.split()
-remove = str(remove[1])
+
+# Removing the lowest candidate
+lowest = (min(presidential.loc["A":"D","Total Votes"]))
+remove = presidential.loc[presidential["Total Votes"] == lowest]
+remove = remove.to_dict()
+presidential.drop(labels=remove['Name'], inplace=True)
+remove = list(remove["Name"])
+
 print(F"Candidate {remove} was eliminated having received a primary vote of {lowest}")
-presidential.drop(labels=remove[0], inplace=True)
 
-
+names = list(presidential.loc[:,"Name"])
 
 
