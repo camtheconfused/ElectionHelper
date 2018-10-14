@@ -5,14 +5,16 @@
 # Released Under a MIT licenceg
 
 import pandas as pd
+import os
 import numpy as np
 from options import *
+import openpyxl
 
 
 def housekeeping():
     """performs various housekeeping functions to ensure that variables exist where they should"""
     header = booths.copy()
-    header.insert(len(header),"Total Votes")
+    header.insert(len(header), "Total Votes")
     header.insert(0, "Name")
     return header
 
@@ -22,7 +24,7 @@ def gen_dataframe():
     candidates = {}
     num_candidates = int(input("How many candidates are there?"))
     header = booths.copy()
-    header.insert(len(header),"Total Votes")
+    header.insert(len(header), "Total Votes")
     for i in range(num_candidates):
         position = str(chr(i + 65))
         name = input(F"What is the name of candidate {position}")
@@ -81,6 +83,7 @@ def get_votes(dataframe, candidate="Primary"):
     pres.index.name = "Position"
     save(pres)
 
+
 def get_sheetname(count):
     """returns the name of the sheet. Count is an int or string."""
     if count == 1:
@@ -88,9 +91,12 @@ def get_sheetname(count):
     else:
         return "Count_" + str(count)
 
+
 def get_total(dataframe):
     """returns the total votes"""
-    total = sum(dataframe.loc["A":"D", "Total Votes"])
+    length = len(dataframe.index)
+    width = len(dataframe.columns)-1
+    total = sum(dataframe.iloc[0:length, width])
     return total
 
 
@@ -100,56 +106,90 @@ def get_informal(dataframe):
     return None
 
 
-def check_winner(dataframe, count = 1):
+def check_winner(dataframe, count=1):
     """Checks if there is a winner, if there is a winner prints their position, name and vote %.
     if there isn't a winner, eliminates the candidate with the lowest vote total and calls get_distribution"""
-    total_votes = dataframe.loc["A":"D", "Total Votes"]
+    length = len(dataframe.index)
+    width = len(dataframe.columns)-1
+    total_votes = dataframe.iloc[0:length, width]
     winner = False
     for vote in total_votes:
         if vote > (0.5 * (get_total(dataframe)) + 1):
-            print("Winner Found...")
+            print("\nWinner Found...")
             winner = True
-            # TODO add in winner finding code
-        else:
-            winner = False
-    if winner is False:
+            highest = max(total_votes)
+            name = dataframe.loc[dataframe['Total Votes'] == highest, 'Name']
+            name = name[0]
+            print(F"{name} "
+                  F"has was elected on count {count} with a preferential vote of {highest} or "
+                  F"{round((highest/get_total(dataframe))*100,2)}% of non-exhausted votes\nCongratulatons!")
+            return name
+    if winner == False:
         print(F"\nNo candidate has a majority on count {count}, going to preferences.")
         lowest_vote = min(total_votes)
-        print(dataframe.loc[dataframe["Total Votes"] == lowest_vote,"Name"])
         name = dataframe.loc[dataframe['Total Votes'] == lowest_vote,'Name']
         name = name[0]
         if count == 1:
-            print(F"Candidate {name} "
-                  F"had the lowest primary vote of {lowest_vote} or"
+            print(F"\n{name} "
+                  F"had the lowest primary vote of {lowest_vote} or "
                   F"{round((lowest_vote/get_total(dataframe))*100,2)}% of votes and has been eliminated")
+        if count != 1:
+                print(F"\n{name} "
+                      F"had the lowest vote of {lowest_vote} or "
+                      F"{round((lowest_vote/get_total(dataframe))*100,2)}% of votes and has been eliminated")
+
         count += 1
-        get_distribution(dataframe, 2, name, lowest_vote)
+        get_distribution(dataframe, count, name, lowest_vote)
 
 
 def get_distribution(dataframe, count,eliminated, votes):
     """Prompts the user to input the preferences for eliminated candidate, calls check winner"""
     candidates = {}
-    preferences = presidential.copy()
+    preferences = dataframe.copy()
     preferences.drop(preferences[preferences.Name == eliminated].index, inplace=True)
+    if "Informal Votes" in preferences.index:
+        preferences.drop("Informal Votes",inplace=True)
     for index, candidate in preferences.iterrows():
         position = index
         name = candidate[0]
+        total_votes=0
         for booth in booths:
-            vote = preferences.loc["A", booth]
+            vote = preferences.loc[position,booth]
             vote += int(input(F"What was {eliminated} preference flow for {name} at booth {booth}"))
-
-
+            preferences.loc[position, booth] = vote
+            total_votes += vote
+        print(total_votes)
+        preferences.loc[position, "Total Votes"] = total_votes
+        print(preferences)
+    exhuasted = ["Exhausted Votes"]
+    exhuasted_total = 0
+    for booth in booths:
+        exhaust = int(input(F"How many of {eliminated}'s votes exhausted at booth {booth}"))
+        exhuasted_total += exhaust
+        exhuasted.append(exhaust)
+    exhuasted.append(exhuasted_total)
+    print(preferences)
+    candidates["Informal"] = exhuasted
+    exhausted = pd.DataFrame.from_dict(candidates, orient="index")
+    preferences.append(exhausted)
+    # TODO Fix exhausted
+    print(preferences)
+    save(preferences,count)
+    check_winner(preferences,count)
+    # TODO add in total checking.
 
 
 def save(dataframe, count=1):
     """Saves the dataframe as an xlx
-    dataframe is a datrame, count is an int"""
-    try:
-        writer = pd.ExcelWriter('presidential.xlsx', engine='xlsxwriter')
-        dataframe.to_excel(writer, sheet_name=get_sheetname(count))
-    except IOError:
-        # TODO fix exception handling when file is open
-        print("Warning: 'presidential.xlsx' may be open, please exit.")
+    dataframe is a dataframe, count is an int"""
+    writer = pd.ExcelWriter("presidential.xlsx", engine='openpyxl')
+    if os.path.isfile("presidential.xlsx"):
+        book = openpyxl.load_workbook("presidential.xlsx")
+        writer.book = book
+    dataframe.to_excel(writer, sheet_name=get_sheetname(count))
+    writer.save()
+    writer.close()
+    # TODO fix exception handling when file is open
 
 
 print("Welcome to SRC Election Helper - Presidential Edition \n\nThis Script will assist in counting and distributing "
